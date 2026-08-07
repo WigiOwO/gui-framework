@@ -1,5 +1,5 @@
 --[=[
-	UiLibrary.lua  (v1.1.0)
+	UiLibrary.lua  (v1.1.1)
 	A small, dependency-free UI library for Roblox — raw instances + UI Constraints.
 	Client-side only: require this from a LocalScript.
 
@@ -22,7 +22,7 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 
 local UI = {}
-UI.Version = "1.1.0"
+UI.Version = "1.1.1"
 
 -- ============================================================
 -- THEME (defaults — dark + purple accent)
@@ -175,6 +175,26 @@ local function bindPress(obj, o)
 			end
 		end
 	end)
+end
+
+-- Input release detection. Some host environments don't expose
+-- InputObject.IsPressed (observed on executor hosts) — probe each input and
+-- fall back to UserInputState.End, then to "assume pressed" (once the input
+-- ends, Changed stops firing, so the drag halts either way).
+local function isInputPressed(input)
+	local ok, pressed = pcall(function()
+		return input.IsPressed
+	end)
+	if ok then
+		return pressed
+	end
+	local ok2, state = pcall(function()
+		return input.UserInputState
+	end)
+	if ok2 then
+		return state ~= Enum.UserInputState.End
+	end
+	return true
 end
 
 -- ============================================================
@@ -367,7 +387,7 @@ function UI.Window(config)
 		local start = input.Position
 		local conn
 		conn = input.Changed:Connect(function()
-			if not input.IsPressed then
+			if not isInputPressed(input) then
 				conn:Disconnect()
 				return
 			end
@@ -827,7 +847,7 @@ function UI.Window(config)
 					updateFromInput(input)
 					local conn
 					conn = input.Changed:Connect(function()
-						if not input.IsPressed then
+						if not isInputPressed(input) then
 							conn:Disconnect()
 							return
 						end
