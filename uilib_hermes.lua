@@ -1,5 +1,5 @@
 --[=[
-	UiLibrary.lua  (v1.0.0)
+	UiLibrary.lua  (v1.1.0)
 	A small, dependency-free UI library for Roblox — raw instances + UI Constraints.
 	Client-side only: require this from a LocalScript.
 
@@ -22,7 +22,7 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 
 local UI = {}
-UI.Version = "1.0.0"
+UI.Version = "1.1.0"
 
 -- ============================================================
 -- THEME (defaults — dark + purple accent)
@@ -197,6 +197,17 @@ function UI.Window(config)
 	local r = theme.CornerRadius
 	local sidebarW = 110
 
+	-- Declared up-front so closures created during construction (drag handler,
+	-- button handlers) can never observe nil — some host environments fire
+	-- input events before the constructor finishes.
+	local win = {}
+	local allDropdowns = {}
+	local function closeAllDropdowns()
+		for _, d in ipairs(allDropdowns) do
+			d:close()
+		end
+	end
+
 	-- Parent: use the provided one, otherwise create our own ScreenGui.
 	local parent = config.Parent
 	if not parent then
@@ -234,9 +245,18 @@ function UI.Window(config)
 		ZIndex = z + 1,
 	}, root)
 
+	-- Space reserved on the right of the title for the minimize/close buttons.
+	local rightReserve = 12
+	if config.Minimizable ~= false then
+		rightReserve = rightReserve + 44
+	end
+	if config.Closable ~= false then
+		rightReserve = rightReserve + 44
+	end
+
 	new("TextLabel", {
 		Position = UDim2.new(0, 14, 0, 0),
-		Size = UDim2.new(1, -64, 1, 0),
+		Size = UDim2.new(1, -rightReserve, 1, 0),
 		BackgroundTransparency = 1,
 		Text = config.Title or "UI",
 		TextColor3 = theme.Text,
@@ -246,6 +266,52 @@ function UI.Window(config)
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		ZIndex = z + 1,
 	}, titleBar)
+
+	-- Minimize button (collapses the window to the title bar; drawn with frames).
+	local minimizeBtn = nil
+	if config.Minimizable ~= false then
+		minimizeBtn = new("Frame", {
+			Position = UDim2.new(1, -88, 0.5, 0),
+			Size = UDim2.fromOffset(28, 28),
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundTransparency = 1,
+			ZIndex = z + 1,
+		}, titleBar)
+		corner(minimizeBtn, 6)
+		local barMin = new("Frame", {
+			Position = UDim2.fromOffset(6, 13),
+			Size = UDim2.fromOffset(16, 2),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = theme.TextMuted,
+		}, minimizeBtn)
+		local barRestore1 = new("Frame", {
+			Position = UDim2.fromOffset(6, 9),
+			Size = UDim2.fromOffset(16, 2),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = theme.TextMuted,
+			Visible = false,
+		}, minimizeBtn)
+		local barRestore2 = new("Frame", {
+			Position = UDim2.fromOffset(6, 15),
+			Size = UDim2.fromOffset(16, 2),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = theme.TextMuted,
+			Visible = false,
+		}, minimizeBtn)
+		bindPress(minimizeBtn, {
+			Base = theme.Surface,
+			Hover = theme.FieldHover,
+			Pressed = theme.FieldPress,
+			OnPress = function()
+				win:SetMinimized(not win._minimized)
+			end,
+		})
+		win._setMinimizeGlyph = function(minimized)
+			barMin.Visible = not minimized
+			barRestore1.Visible = minimized
+			barRestore2.Visible = minimized
+		end
+	end
 
 	-- Close button (drawn as a frame "x", no font-glyph dependency).
 	local closeBtn = nil
@@ -289,11 +355,14 @@ function UI.Window(config)
 			and input.UserInputType ~= Enum.UserInputType.Touch then
 			return
 		end
-		-- Don't start a drag when grabbing the close button.
+		-- Don't start a drag when grabbing the minimize/close buttons.
+		if minimizeBtn and gObject and gObject:IsDescendantOf(minimizeBtn) then
+			return
+		end
 		if closeBtn and gObject and gObject:IsDescendantOf(closeBtn) then
 			return
 		end
-		win:_closeDropdowns()
+		closeAllDropdowns()
 		local startScale = root.Position
 		local start = input.Position
 		local conn
@@ -356,21 +425,18 @@ function UI.Window(config)
 	-- WINDOW OBJECT
 	-- ============================================================
 
-	local win = {
-		_theme = theme,
-		_root = root,
-		_parent = parent,
-		_z = z,
-		_tabs = {},
-		_tabOrder = {},
-		_dropdowns = {},
-	}
-
-	local function closeAllDropdowns()
-		for _, d in ipairs(win._dropdowns) do
-			d:close()
-		end
-	end
+	win._theme = theme
+	win._root = root
+	win._parent = parent
+	win._z = z
+	win._tabs = {}
+	win._tabOrder = {}
+	win._sidebar = sidebar
+	win._content = contentFrame
+	win._minimizeBtn = minimizeBtn
+	win._minimized = false
+	win._fullSize = nil
+	win._dropdowns = allDropdowns
 
 	local function refreshLayouts()
 		for _, tab in ipairs(win._tabOrder) do
@@ -390,6 +456,35 @@ function UI.Window(config)
 			tween(root, { GroupTransparency = 0 }, 0.18)
 			refreshLayouts()
 		end
+	end
+
+	function win:SetMinimized(v)
+		v = v == true
+		if win._minimized == v then return end
+		win._minimized = v
+		closeAllDropdowns()
+		if v then
+			win._fullSize = root.Size
+			-- Keep the title bar exactly where it is while the body collapses.
+			local absPos = root.AbsolutePosition
+			root.AnchorPoint = Vector2.new(0.5, 0)
+			root.Position = UDim2.fromOffset(absPos.X + root.AbsoluteSize.X / 2, absPos.Y)
+			tween(root, { Size = UDim2.new(win._fullSize.X.Scale, win._fullSize.X.Offset, 0, 36) }, 0.15)
+			sidebar.Visible = false
+			contentFrame.Visible = false
+		else
+			sidebar.Visible = true
+			contentFrame.Visible = true
+			tween(root, { Size = win._fullSize or config.Size or UDim2.fromScale(0.28, 0.55) }, 0.15)
+			refreshLayouts()
+		end
+		if win._setMinimizeGlyph then
+			win._setMinimizeGlyph(v)
+		end
+	end
+
+	function win:Minimize()
+		win:SetMinimized(not win._minimized)
 	end
 
 	function win:Toggle()
@@ -1009,7 +1104,7 @@ function UI.Window(config)
 				popup:Destroy()
 				blocker:Destroy()
 			end }
-			table.insert(win._dropdowns, dropdown)
+			table.insert(allDropdowns, dropdown)
 
 			refreshOptions()
 			row.LayoutOrder = nextOrder()
