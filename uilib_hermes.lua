@@ -1,5 +1,5 @@
 --[=[
-	UiLibrary.lua  (v1.1.1)
+	UiLibrary.lua  (v1.1.2)
 	A small, dependency-free UI library for Roblox — raw instances + UI Constraints.
 	Client-side only: require this from a LocalScript.
 
@@ -20,9 +20,10 @@
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 
 local UI = {}
-UI.Version = "1.1.1"
+UI.Version = "1.1.2"
 
 -- ============================================================
 -- THEME (defaults — dark + purple accent)
@@ -175,26 +176,6 @@ local function bindPress(obj, o)
 			end
 		end
 	end)
-end
-
--- Input release detection. Some host environments don't expose
--- InputObject.IsPressed (observed on executor hosts) — probe each input and
--- fall back to UserInputState.End, then to "assume pressed" (once the input
--- ends, Changed stops firing, so the drag halts either way).
-local function isInputPressed(input)
-	local ok, pressed = pcall(function()
-		return input.IsPressed
-	end)
-	if ok then
-		return pressed
-	end
-	local ok2, state = pcall(function()
-		return input.UserInputState
-	end)
-	if ok2 then
-		return state ~= Enum.UserInputState.End
-	end
-	return true
 end
 
 -- ============================================================
@@ -370,6 +351,10 @@ function UI.Window(config)
 
 	-- Drag: keep the Position's Scale parts (responsive placement) and only
 	-- accumulate the mouse delta into the Offset parts. Clamped to the screen.
+	-- Release detection via UserInputService.InputEnded (input identity match) —
+	-- the library never reads InputObject properties (some hosts lack IsPressed).
+	local dragConn = nil
+	local dragRelease = nil
 	titleBar.InputBegan:Connect(function(input, gObject)
 		if input.UserInputType ~= Enum.UserInputType.MouseButton1
 			and input.UserInputType ~= Enum.UserInputType.Touch then
@@ -385,12 +370,8 @@ function UI.Window(config)
 		closeAllDropdowns()
 		local startScale = root.Position
 		local start = input.Position
-		local conn
-		conn = input.Changed:Connect(function()
-			if not isInputPressed(input) then
-				conn:Disconnect()
-				return
-			end
+		if dragConn then dragConn:Disconnect() end
+		dragConn = input.Changed:Connect(function()
 			local delta = input.Position - start
 			local screen = root.Parent.AbsoluteSize
 			local size = root.AbsoluteSize
@@ -412,6 +393,17 @@ function UI.Window(config)
 				)
 			end
 			root.Position = UDim2.new(startScale.X.Scale, xOff, startScale.Y.Scale, yOff)
+		end)
+		if dragRelease then dragRelease:Disconnect() end
+		dragRelease = UserInputService.InputEnded:Connect(function(endedInput)
+			if endedInput == input then
+				if dragConn then
+					dragConn:Disconnect()
+					dragConn = nil
+				end
+				dragRelease:Disconnect()
+				dragRelease = nil
+			end
 		end)
 	end)
 
@@ -841,17 +833,26 @@ function UI.Window(config)
 				setValue(min + range * frac, true)
 			end
 
+			local sliderConn = nil
+			local sliderRelease = nil
 			track.InputBegan:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1
 					or input.UserInputType == Enum.UserInputType.Touch then
 					updateFromInput(input)
-					local conn
-					conn = input.Changed:Connect(function()
-						if not isInputPressed(input) then
-							conn:Disconnect()
-							return
-						end
+					if sliderConn then sliderConn:Disconnect() end
+					sliderConn = input.Changed:Connect(function()
 						updateFromInput(input)
+					end)
+					if sliderRelease then sliderRelease:Disconnect() end
+					sliderRelease = UserInputService.InputEnded:Connect(function(endedInput)
+						if endedInput == input then
+							if sliderConn then
+								sliderConn:Disconnect()
+								sliderConn = nil
+							end
+							sliderRelease:Disconnect()
+							sliderRelease = nil
+						end
 					end)
 				end
 			end)
