@@ -1,5 +1,5 @@
 --[=[
-	UiLibrary.lua  (v1.1.2)
+	UiLibrary.lua  (v1.2.0)
 	A small, dependency-free UI library for Roblox — raw instances + UI Constraints.
 	Client-side only: require this from a LocalScript.
 
@@ -23,7 +23,7 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
 local UI = {}
-UI.Version = "1.1.2"
+UI.Version = "1.2.0"
 
 -- ============================================================
 -- THEME (defaults — dark + purple accent)
@@ -34,7 +34,7 @@ UI.Version = "1.1.2"
 -- Probe once at load and pick whichever the host accepts.
 local function makeFonts()
 	local okNormal, normal = pcall(function()
-		return Font.new("rbxasset://fonts/families/GothamSSm.json")
+		return Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium, Enum.FontStyle.Normal)
 	end)
 	local okBold, bold = pcall(function()
 		return Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
@@ -51,7 +51,7 @@ local function makeFonts()
 	end
 	-- Legacy fallback: enum fonts (GothamSSm exists on older clients).
 	local okEnum1, enumNormal = pcall(function()
-		return Enum.Font.GothamSSm
+		return Enum.Font.GothamSSmMedium
 	end)
 	local okEnum2, enumBold = pcall(function()
 		return Enum.Font.GothamSSmBold
@@ -69,23 +69,25 @@ UI.Theme = {
 	Font = themeFont,
 	FontBold = themeFontBold,
 
-	Background = Color3.fromRGB(19, 19, 26), -- window body
-	Surface = Color3.fromRGB(26, 26, 35), -- title bar / sidebar
-	Field = Color3.fromRGB(36, 36, 48), -- rows / inputs
-	FieldHover = Color3.fromRGB(47, 47, 62),
-	FieldPress = Color3.fromRGB(29, 29, 39),
+	-- BookFinder-inspired palette: dark purple, bordered accent cards
+	Background = Color3.fromRGB(13, 10, 26), -- window body
+	Surface = Color3.fromRGB(22, 18, 44), -- title bar / sidebar
+	Field = Color3.fromRGB(22, 18, 44), -- rows / inputs
+	FieldHover = Color3.fromRGB(33, 28, 60),
+	FieldPress = Color3.fromRGB(18, 15, 36),
 
-	Accent = Color3.fromRGB(139, 92, 246), -- purple
-	AccentHover = Color3.fromRGB(163, 122, 250),
-	AccentPress = Color3.fromRGB(116, 74, 220),
+	Accent = Color3.fromRGB(124, 92, 191), -- purple
+	AccentHover = Color3.fromRGB(148, 120, 214),
+	AccentPress = Color3.fromRGB(100, 72, 160),
 
-	Text = Color3.fromRGB(240, 240, 245),
-	TextMuted = Color3.fromRGB(146, 146, 163),
-	Outline = Color3.fromRGB(52, 52, 68),
-	Danger = Color3.fromRGB(240, 90, 90),
+	Text = Color3.fromRGB(232, 224, 240),
+	TextMuted = Color3.fromRGB(150, 140, 160),
+	Outline = Color3.fromRGB(47, 40, 72),
+	Danger = Color3.fromRGB(207, 79, 79),
+	Dropdown = Color3.fromRGB(10, 8, 20), -- dropdown list fill
 
 	RowHeight = 32,
-	CornerRadius = 8,
+	CornerRadius = 10,
 }
 
 -- ============================================================
@@ -235,7 +237,7 @@ function UI.Window(config)
 		ZIndex = z,
 	}, parent)
 	corner(root, r)
-	new("UIStroke", { Color = theme.Outline, Thickness = 1, Transparency = 0 }, root)
+	new("UIStroke", { Color = theme.Accent, Thickness = 1.5, Transparency = 0 }, root)
 
 	-- Title bar (inset horizontally by the corner radius so its square corners
 	-- don't poke out past the window's rounded ones).
@@ -262,7 +264,7 @@ function UI.Window(config)
 		Text = config.Title or "UI",
 		TextColor3 = theme.Text,
 		Font = theme.FontBold,
-		TextSize = 15,
+		TextSize = 16,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		ZIndex = z + 1,
@@ -559,7 +561,7 @@ function UI.Window(config)
 			Text = name,
 			TextColor3 = theme.TextMuted,
 			Font = theme.Font,
-			TextSize = 14,
+			TextSize = 13,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			ZIndex = z + 2,
@@ -572,8 +574,8 @@ function UI.Window(config)
 			Visible = false,
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			ScrollBarThickness = 4,
-			ScrollBarImageColor3 = theme.Outline,
-			ScrollBarImageTransparency = 0.4,
+			ScrollBarImageColor3 = theme.Accent,
+			ScrollBarImageTransparency = 0.35,
 			VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
 			ZIndex = z + 1,
 		}, contentFrame)
@@ -630,6 +632,8 @@ function UI.Window(config)
 				ZIndex = z + 2,
 			}, page)
 			corner(row, 6)
+			-- Bordered-card look: subtle accent outline on every control.
+			new("UIStroke", { Color = theme.Accent, Thickness = 1, Transparency = 0.5 }, row)
 			return row
 		end
 
@@ -644,7 +648,7 @@ function UI.Window(config)
 				Text = config.Text or "Button",
 				TextColor3 = theme.Text,
 				Font = theme.Font,
-				TextSize = 14,
+				TextSize = 13,
 				ZIndex = z + 3,
 			}, row)
 			local enabled = true
@@ -687,7 +691,7 @@ function UI.Window(config)
 				Text = config.Text or "Toggle",
 				TextColor3 = theme.Text,
 				Font = theme.Font,
-				TextSize = 14,
+				TextSize = 13,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				ZIndex = z + 3,
@@ -700,6 +704,7 @@ function UI.Window(config)
 				ZIndex = z + 3,
 			}, row)
 			corner(pill, 11)
+			new("UIStroke", { Color = theme.Accent, Thickness = 1, Transparency = 0.5 }, pill)
 			local knob = new("Frame", {
 				Position = UDim2.new(0, 2, 0.5, 0),
 				Size = UDim2.fromOffset(18, 18),
@@ -766,7 +771,7 @@ function UI.Window(config)
 				Text = config.Text or "Slider",
 				TextColor3 = theme.Text,
 				Font = theme.Font,
-				TextSize = 14,
+				TextSize = 13,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				ZIndex = z + 3,
@@ -786,10 +791,11 @@ function UI.Window(config)
 			local track = new("Frame", {
 				Position = UDim2.new(0, 12, 0, 34),
 				Size = UDim2.new(1, -24, 0, 8),
-				BackgroundColor3 = theme.Surface,
+				BackgroundColor3 = theme.Background,
 				ZIndex = z + 3,
 			}, row)
 			corner(track, 4)
+			new("UIStroke", { Color = theme.Accent, Thickness = 1, Transparency = 0.35 }, track)
 			local fill = new("Frame", {
 				Size = UDim2.new(0, 0, 1, 0),
 				BackgroundColor3 = theme.Accent,
@@ -873,12 +879,7 @@ function UI.Window(config)
 		function tab:TextBox(config)
 			config = config or {}
 			local row = makeRow(theme.RowHeight)
-			local stroke = new("UIStroke", {
-				Color = theme.Accent,
-				Thickness = 1,
-				Transparency = 1,
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			}, row)
+			local stroke = row:FindFirstChildOfClass("UIStroke")
 			local box = new("TextBox", {
 				Position = UDim2.new(0, 12, 0, 0),
 				Size = UDim2.new(1, -24, 1, 0),
@@ -888,7 +889,7 @@ function UI.Window(config)
 				PlaceholderColor3 = theme.TextMuted,
 				TextColor3 = theme.Text,
 				Font = theme.Font,
-				TextSize = 14,
+				TextSize = 13,
 				ClearTextOnFocus = false,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = z + 3,
@@ -900,7 +901,7 @@ function UI.Window(config)
 				tween(stroke, { Transparency = 0 }, 0.1)
 			end)
 			box.FocusLost:Connect(function()
-				tween(stroke, { Transparency = 1 }, 0.15)
+				tween(stroke, { Transparency = 0.5 }, 0.15)
 				handle.Value = box.Text
 				if config.Callback then
 					config.Callback(box.Text)
@@ -942,7 +943,7 @@ function UI.Window(config)
 				Text = config.Text or "Dropdown",
 				TextColor3 = theme.TextMuted,
 				Font = theme.Font,
-				TextSize = 14,
+				TextSize = 13,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				ZIndex = z + 3,
@@ -955,7 +956,7 @@ function UI.Window(config)
 				Text = tostring(selected or "—"),
 				TextColor3 = theme.Text,
 				Font = theme.Font,
-				TextSize = 14,
+				TextSize = 13,
 				TextXAlignment = Enum.TextXAlignment.Right,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				ZIndex = z + 3,
@@ -990,13 +991,13 @@ function UI.Window(config)
 			-- window's ClipsDescendants can't cut them off.
 			local popup = new("Frame", {
 				Size = UDim2.fromOffset(0, 0),
-				BackgroundColor3 = theme.Surface,
+				BackgroundColor3 = theme.Dropdown,
 				BackgroundTransparency = 1,
 				Visible = false,
 				ZIndex = z + 50,
 			}, parent)
 			corner(popup, 6)
-			new("UIStroke", { Color = theme.Outline, Thickness = 1, Transparency = 0 }, popup)
+			new("UIStroke", { Color = theme.Accent, Thickness = 1, Transparency = 0.5 }, popup)
 			new("UIPadding", {
 				PaddingTop = UDim.new(0, 4),
 				PaddingBottom = UDim.new(0, 4),
