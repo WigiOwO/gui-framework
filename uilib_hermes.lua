@@ -28,9 +28,45 @@ UI.Version = "1.0.0"
 -- THEME (defaults — dark + purple accent)
 -- ============================================================
 
+-- Font compatibility. Modern Roblox types the Font property as a Font class;
+-- some executor/legacy host environments still type it as an enum (EnumItem).
+-- Probe once at load and pick whichever the host accepts.
+local function makeFonts()
+	local okNormal, normal = pcall(function()
+		return Font.new("rbxasset://fonts/families/GothamSSm.json")
+	end)
+	local okBold, bold = pcall(function()
+		return Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+	end)
+	if okNormal and okBold then
+		local acceptsClass = pcall(function()
+			local probe = Instance.new("TextLabel")
+			probe.Font = normal
+			probe:Destroy()
+		end)
+		if acceptsClass then
+			return normal, bold
+		end
+	end
+	-- Legacy fallback: enum fonts (GothamSSm exists on older clients).
+	local okEnum1, enumNormal = pcall(function()
+		return Enum.Font.GothamSSm
+	end)
+	local okEnum2, enumBold = pcall(function()
+		return Enum.Font.GothamSSmBold
+	end)
+	if okEnum1 and okEnum2 then
+		return enumNormal, enumBold
+	end
+	-- Last resort: SourceSans (present in every known Roblox version).
+	return Enum.Font.SourceSans, Enum.Font.SourceSansBold
+end
+
+local themeFont, themeFontBold = makeFonts()
+
 UI.Theme = {
-	Font = Font.new("rbxasset://fonts/families/GothamSSm.json"),
-	FontBold = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+	Font = themeFont,
+	FontBold = themeFontBold,
 
 	Background = Color3.fromRGB(19, 19, 26), -- window body
 	Surface = Color3.fromRGB(26, 26, 35), -- title bar / sidebar
