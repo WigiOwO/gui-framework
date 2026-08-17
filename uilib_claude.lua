@@ -164,6 +164,70 @@ function UILib:CreateWindow(config)
 
 	makeDraggable(Main, TopBar)
 
+	-- Close button
+	local CloseBtn = create("TextButton", {
+		Text = "✕",
+		Font = FONT_BOLD,
+		TextSize = 14,
+		TextColor3 = Theme.SubText,
+		BackgroundTransparency = 1,
+		Position = UDim2.new(1, -34, 0, 6),
+		Size = UDim2.fromOffset(28, 28),
+		AutoButtonColor = false,
+		Parent = TopBar,
+	}, { corner(6) })
+	CloseBtn.MouseEnter:Connect(function()
+		tween(CloseBtn, { BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(200, 60, 60) })
+		tween(CloseBtn, { TextColor3 = Color3.new(1, 1, 1) })
+	end)
+	CloseBtn.MouseLeave:Connect(function()
+		tween(CloseBtn, { BackgroundTransparency = 1 })
+		tween(CloseBtn, { TextColor3 = Theme.SubText })
+	end)
+	CloseBtn.MouseButton1Click:Connect(function()
+		ScreenGui:Destroy()
+	end)
+
+	-- Minimize button
+	local MinimizeBtn = create("TextButton", {
+		Text = "—",
+		Font = FONT_BOLD,
+		TextSize = 14,
+		TextColor3 = Theme.SubText,
+		BackgroundTransparency = 1,
+		Position = UDim2.new(1, -64, 0, 6),
+		Size = UDim2.fromOffset(28, 28),
+		AutoButtonColor = false,
+		Parent = TopBar,
+	}, { corner(6) })
+	MinimizeBtn.MouseEnter:Connect(function()
+		tween(MinimizeBtn, { BackgroundTransparency = 0, BackgroundColor3 = Theme.PanelLight })
+	end)
+	MinimizeBtn.MouseLeave:Connect(function()
+		tween(MinimizeBtn, { BackgroundTransparency = 1 })
+	end)
+
+	local minimized = false
+	local expandedSize = Main.Size
+	local function toggleMinimize()
+		minimized = not minimized
+		if minimized then
+			expandedSize = Main.Size
+			Sidebar.Visible = false
+			ContentArea.Visible = false
+			tween(Main, { Size = UDim2.fromOffset(expandedSize.X.Offset, 44) }, 0.2)
+			MinimizeBtn.Text = "▢"
+		else
+			tween(Main, { Size = expandedSize }, 0.2)
+			task.delay(0.2, function()
+				Sidebar.Visible = true
+				ContentArea.Visible = true
+			end)
+			MinimizeBtn.Text = "—"
+		end
+	end
+	MinimizeBtn.MouseButton1Click:Connect(toggleMinimize)
+
 	-- Sidebar
 	local Sidebar = create("Frame", {
 		Name = "Sidebar",
@@ -203,6 +267,14 @@ function UILib:CreateWindow(config)
 		Tabs = {},
 		_tabOrder = 0,
 	}, UILib)
+
+	function Window:Close()
+		ScreenGui:Destroy()
+	end
+
+	function Window:Toggle()
+		toggleMinimize()
+	end
 
 	return Window
 end
